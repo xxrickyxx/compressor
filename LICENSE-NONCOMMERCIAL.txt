@@ -1,0 +1,43 @@
+Compressor Noncommercial Educational License, version 1.0
+Copyright (c) 2026 xxrickyxx and contributors.
+
+1. Grant. Subject to these terms, the copyright holders grant you a worldwide,
+royalty-free, nonexclusive license to use, copy, study, modify and distribute
+the original Compressor code and your modifications solely for noncommercial
+personal learning, classroom teaching, academic study, noncommercial research
+and noncommercial experimentation.
+
+2. Noncommercial restriction. You may not use the software to operate or
+support a business, paid service, commercial product, paid consulting,
+revenue-generating hosting, commercial training or an activity primarily
+intended for commercial advantage or monetary compensation. Internal business
+use is commercial use even when no copy of the software is sold. A nonprofit
+or educational affiliation alone does not authorize commercial activity.
+Such use requires the separate commercial license.
+
+3. Distribution. You must retain this license, the copyright notice and the
+licensing notice in every distributed copy or substantial portion. Clearly
+identify modifications. Your distributed modifications to the original code
+must remain available under these same noncommercial terms. You may not impose
+terms that prevent recipients from exercising the rights granted here.
+
+4. Scope. This license covers only rights the licensors have in the original
+software. It does not grant trademark rights, rights in model weights, or
+rights in third-party software. It does not promise a patent license or
+indemnification against third-party claims.
+
+5. Termination. If you violate these terms, your rights terminate. They are
+reinstated if you remedy the violation within 30 days after first receiving
+written notice from a copyright holder, unless your rights were previously
+terminated for another violation. Termination does not change the rights of
+downstream recipients who comply with this license.
+
+6. No warranty. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR
+PURPOSE AND NONINFRINGEMENT. TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW,
+THE COPYRIGHT HOLDERS ARE NOT LIABLE FOR CLAIMS, DAMAGES OR OTHER LIABILITY
+ARISING FROM THE SOFTWARE OR ITS USE. Mandatory legal rights are unaffected.
+
+This license restricts commercial use and is not an open-source license under
+the Open Source Definition. Commercial licensing enquiries may be directed to
+the maintainer through https://github.com/xxrickyxx/compressor.

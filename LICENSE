@@ -1,0 +1,15 @@
+Compressor — Licensing notice
+Copyright (c) 2026 xxrickyxx and contributors.
+
+The original Compressor code is offered under two alternative routes:
+
+1. The free Noncommercial Educational License in LICENSE-NONCOMMERCIAL.txt.
+2. The Commercial License terms in LICENSE-COMMERCIAL.md, which require a
+   separate written commercial order accepted by the copyright holder.
+
+Choose the license applicable to your use. The commercial route is not
+automatically activated by downloading this repository. The noncommercial
+license is source-available, not an OSI-approved open-source license.
+
+Third-party dependencies, model weights, tokenizers and native runtimes are
+not relicensed by these documents. See THIRD_PARTY_NOTICES.md.

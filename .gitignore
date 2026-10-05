@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+.venv/
+prove_modelli/
+*.cmp
+*.safetensors
+*.gguf
+*.log
+runtime.json
+models.json
+api-key.txt
+runtime/windows/
+*.jpg
+backups/
