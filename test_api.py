@@ -68,5 +68,13 @@ class Tests(unittest.TestCase):
             self.assertFalse(state['busy']); self.assertIsNone(state['error'])
             self.assertEqual(state['result']['integrity'],'OK')
             server.Archive(dst).verify()
+    def test_unload_respects_active_operation(self):
+        with patch.dict(server.STATE,{'busy':True}):
+            with self.assertRaises(ValueError): server.unload_engine()
+        with patch.object(server,'ENGINE') as engine,patch.object(server,'ENGINE_KEY',('test','ram')),patch.dict(server.STATE,{'busy':False}):
+            result=server.unload_engine()
+            engine.close.assert_called_once()
+            self.assertIsNone(server.ENGINE)
+            self.assertTrue(result['unloaded'])
 
 if __name__=='__main__': unittest.main()

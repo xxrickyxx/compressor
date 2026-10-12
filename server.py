@@ -24,6 +24,19 @@ ENGINE_KEY=None
 JOBS={}
 API_KEY=None
 
+def unload_engine():
+    global ENGINE,ENGINE_KEY
+    import gc
+    import psutil
+    with LOCK:
+        if STATE['busy']: raise ValueError('Attendi la fine dell’operazione corrente prima di liberare la RAM.')
+        before=psutil.Process().memory_info().rss
+        if ENGINE:
+            ENGINE.close(); ENGINE=None; ENGINE_KEY=None
+        gc.collect()
+        after=psutil.Process().memory_info().rss
+        return {'unloaded':True,'rss_before_bytes':before,'rss_after_bytes':after,'released_rss_bytes':max(0,before-after)}
+
 def get_api_key():
     path=ROOT/'api-key.txt'
     if not path.exists():
@@ -154,7 +167,11 @@ class Handler(BaseHTTPRequestHandler):
             self.send_response(200); self.send_header('Content-Type','text/html; charset=utf-8'); self.send_header('Cache-Control','no-store'); self.end_headers(); self.wfile.write(raw)
         elif self.headers.get('X-App-Token')!=TOKEN: self.send({'error':'Accesso non autorizzato'},403)
         elif path=='/api/state':
-            with LOCK: snapshot=dict(STATE)
+            import psutil
+            with LOCK:
+                snapshot=dict(STATE)
+                snapshot['engine_mode']=ENGINE.mode if ENGINE else None
+                snapshot['process_rss_bytes']=psutil.Process().memory_info().rss
             self.send(snapshot)
         elif path=='/api/models': self.send(models())
         elif path=='/api/integration':
@@ -173,6 +190,7 @@ class Handler(BaseHTTPRequestHandler):
             data=json.loads(self.rfile.read(length))
             if self.path=='/api/run': job_id=launch(data); self.send({'ok':True,'job_id':job_id})
             elif self.path=='/api/stop': STOP.set(); self.send({'ok':True})
+            elif self.path=='/api/unload': self.send(unload_engine())
             elif self.path=='/api/pick':
                 import tkinter as tk
                 from tkinter import filedialog

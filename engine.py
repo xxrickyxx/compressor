@@ -45,6 +45,49 @@ class CompressedWeights:
         self.bytes_read += len(raw)
         return torch.frombuffer(raw,dtype=dtype).reshape(shape)
 
+    def close(self):
+        self.archive.close()
+
+class ShardedCompressedWeights:
+    """Indice di più archivi safetensors, con accesso diretto al tensore."""
+    def __init__(self,path):
+        path=Path(path).resolve()
+        if path.stat().st_size>16*1024*1024: raise ValueError('Indice modello troppo grande.')
+        manifest=json.loads(path.read_text(encoding='utf8'))
+        if manifest.get('format')!='cmp-sharded-v1': raise ValueError('Indice modello non riconosciuto.')
+        self.readers={}
+        self.header={}
+        self.weight_map=manifest['weight_map']
+        try:
+            for source,filename in manifest['shards'].items():
+                archive=(path.parent/filename).resolve()
+                if not archive.is_relative_to(path.parent): raise ValueError('L’archivio deve restare nella cartella dell’indice.')
+                self.readers[source]=CompressedWeights(archive)
+            actual={}
+            for source,reader in self.readers.items():
+                for name,item in reader.header.items():
+                    if name=='__metadata__': continue
+                    if name in actual: raise ValueError('Tensore duplicato fra gli archivi.')
+                    actual[name]=source
+                    self.header[name]=item
+            if actual!=self.weight_map: raise ValueError('L’indice dei tensori non corrisponde agli archivi.')
+        except Exception:
+            self.close(); raise
+
+    @property
+    def bytes_read(self): return sum(reader.bytes_read for reader in self.readers.values())
+
+    def tensor(self,name): return self.tensor_rows(name)
+
+    def tensor_rows(self,name,start=0,count=None):
+        return self.readers[self.weight_map[name]].tensor_rows(name,start,count)
+
+    def close(self):
+        for reader in self.readers.values(): reader.close()
+
+def open_compressed_weights(path):
+    return ShardedCompressedWeights(path) if Path(path).suffix=='.json' else CompressedWeights(path)
+
 class CompressedEngine:
     def __init__(self, archive, config_dir, mode='direct', status=None, stop=None):
         torch=import_torch()
@@ -53,7 +96,7 @@ class CompressedEngine:
         self.status = status or (lambda text: None)
         self.mode = mode
         self.decoded_peak_bytes=0
-        self.weights = CompressedWeights(archive)
+        self.weights = open_compressed_weights(archive)
         self.config_dir = Path(config_dir)
         config = AutoConfig.from_pretrained(config_dir,local_files_only=True,trust_remote_code=False)
         if config.model_type != 'qwen3':
@@ -74,7 +117,7 @@ class CompressedEngine:
         self.handles = []
         if mode=='direct':
             embedding_name='model.embed_tokens.weight' if 'model.embed_tokens.weight' in self.weights.header else 'lm_head.weight'
-            output_name='lm_head.weight' if 'lm_head.weight' in self.weights.header else embedding_name
+            output_name=embedding_name if config.tie_word_embeddings else ('lm_head.weight' if 'lm_head.weight' in self.weights.header else embedding_name)
             engine=self
             class RowEmbedding(torch.nn.Module):
                 def forward(self,ids):
@@ -112,6 +155,10 @@ class CompressedEngine:
         def hook(module,args):
             if self.stop.is_set(): raise InterruptedError('Generazione annullata.')
             if prefix in self.loaded: return
+            if prefix=='lm_head' and self.model.config.tie_word_embeddings:
+                module.weight=self.model.model.embed_tokens.weight
+                self.loaded.add(prefix)
+                return
             self.status(f'Lettura dall’archivio: {prefix}')
             state = {}
             for name,param in module.named_parameters():
@@ -190,4 +237,4 @@ class CompressedEngine:
         for handle in self.handles: handle.remove()
         self.model.to('meta')
         self.loaded.clear()
-        self.weights.archive.close()
+        self.weights.close()

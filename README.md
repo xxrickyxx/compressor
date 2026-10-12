@@ -14,6 +14,8 @@ archive. Windows-first prototype; CPU inference.
   chat completions and SSE streaming.
 - Qwen3 safetensors inference from CMP archives, using layer-at-a-time weight
   decoding, row-at-a-time embeddings and a chunked output head.
+- Multi-file Qwen checkpoints through a `cmp-sharded-v1` JSON manifest. Each
+  original safetensors part is compressed and verified separately.
 
 ## Memory: what this actually saves
 
@@ -116,6 +118,11 @@ networks; this server does not implement TLS.
 
 ## Context window
 
+The chat panel shows the current process memory and includes **Libera RAM del
+modello** to discard cached numeric weights while keeping the service and
+conversation open. It refuses to unload during an active operation. In RAM
+mode, expanded weights intentionally remain resident until unloaded or replaced.
+
 The context window is adjustable in the chat UI from **128 to 8,192 tokens**
 (default 1,024). It includes the full chat template/history and the generated
 answer. Increasing this limit does not preallocate the whole window, but long
@@ -124,6 +131,22 @@ prompts need more memory and CPU time. API clients can pass
 shortened; prompts that fill the window are rejected without silent truncation.
 
 ## Tests
+
+To download and prepare the official dense Qwen3-1.7B checkpoint:
+
+```sh
+.venv/Scripts/python.exe download_qwen17.py
+.venv/Scripts/python.exe compare_qwen_models.py
+```
+
+The download helper pins the upstream revision, verifies the official weight
+SHA-256 values, compresses both safetensors parts and registers the manifest
+for chat/API usage. It uses bounded HTTP ranges for large downloads. Model
+assets and archives remain outside Git. The comparison uses six short tasks;
+its exact-match score is not a general model ranking.
+
+When a checkpoint ties its input and output embeddings, RAM mode now shares
+the same tensor instead of keeping two copies, matching the standard model.
 
 ```sh
 python test_compressione.py

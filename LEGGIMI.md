@@ -6,6 +6,17 @@ La cartella **prove_modelli** contiene gli archivi delle prove reali e il rappor
 
 ## Chat dal modello compresso
 
+Il checkpoint Qwen3-1.7B è disponibile come modello aggiuntivo nel menu.
+È un modello denso; i pesi ufficiali sono distribuiti in due parti. Il programma
+le comprime separatamente e usa un indice JSON per raggiungere i tensori.
+Le modalità a strati e cache RAM funzionano anche con questo indice.
+
+Il pannello mostra la memoria del **processo**, distinta dal totale di Windows.
+**Libera RAM del modello** scarica i pesi memorizzati senza chiudere il servizio;
+non è disponibile durante una generazione. La cache RAM tiene i pesi numerici
+residenti per velocizzare le richieste successive. I pesi di embedding e uscita
+condividono la stessa copia quando previsto dalla configurazione del modello.
+
 La scheda **API** mostra URL, ID del modello e chiave per integrare la chat
 con altri programmi. Il servizio usa normalmente la porta 8765. Gli endpoint
 sono descritti in **API.md**, lo schema in **openapi.json**. La chiave persistente

@@ -18,24 +18,27 @@ def restore_assets():
     rows=json.loads((registry if registry.exists() else legacy).read_text(encoding='utf8'))
     changed=False
     for row in rows:
-        if 'models--Qwen--Qwen3-0.6B' not in row.get('source','') and row.get('hf_repo')!='Qwen/Qwen3-0.6B': continue
+        repo=row.get('hf_repo')
+        if not repo and 'models--Qwen--Qwen3-0.6B' in row.get('source',''): repo='Qwen/Qwen3-0.6B'
+        if repo not in ('Qwen/Qwen3-0.6B','Qwen/Qwen3-1.7B'): continue
         if not Path(row['archive']).is_file(): continue
-        folder=ROOT/'models/qwen3-0.6b'
+        revision=row.get('hf_revision') or (REVISION if repo=='Qwen/Qwen3-0.6B' else 'main')
+        folder=ROOT/'models'/repo.split('/')[-1].lower()
         folder.mkdir(parents=True,exist_ok=True)
         for name in ASSETS:
             target=folder/name
             if target.is_file(): continue
             print('Recupero '+name,flush=True)
-            url=f'https://huggingface.co/Qwen/Qwen3-0.6B/resolve/{REVISION}/{name}'
+            url=f'https://huggingface.co/{repo}/resolve/{revision}/{name}'
             with urllib.request.urlopen(url,timeout=120) as response: content=response.read()
             temporary=target.with_suffix(target.suffix+'.download')
             temporary.write_bytes(content); temporary.replace(target)
         row['config_dir']=str(folder)
         row['model_type']='qwen3'
-        row['hf_repo']='Qwen/Qwen3-0.6B'
-        row['hf_revision']=REVISION
-        row.setdefault('id','qwen3-0.6b-cmp')
-        row.setdefault('label','Qwen3 · 0,6B')
+        row['hf_repo']=repo
+        row['hf_revision']=revision
+        row.setdefault('id',repo.split('/')[-1].lower()+'-cmp')
+        row.setdefault('label',repo.split('/')[-1])
         changed=True
     if changed:
         registry.write_text(json.dumps(rows,indent=2,ensure_ascii=False),encoding='utf8')

@@ -1,5 +1,20 @@
 # Verifiche della versione 0.2
 
+## Modello Qwen3-1.7B e rilascio RAM — 12 ottobre 2026
+
+- Download del checkpoint ufficiale verificato con i SHA-256 upstream; le due
+  parti compresse superano la verifica completa CRC32/SHA-256.
+- Lettore a più archivi: instradamento dei tensori, rifiuto di indici incoerenti
+  e di percorsi fuori dalla cartella verificati automaticamente.
+- Tredici test automatici superati; il rilascio RAM è bloccato mentre un lavoro
+  è in corso.
+- Modello di riferimento: risultati numerici identici su archivio singolo e
+  manifest a due parti, sia in modalità direct sia RAM; verificato anche il
+  contesto da 600 token e la condivisione effettiva dell’embedding in RAM.
+- Risposta di riferimento standard Hugging Face di Qwen0.6 controllata contro
+  la risposta del nostro motore, senza differenze nella prova scelta.
+- Confronto reale di sei richieste su 0.6B e 1.7B: dettagli in QWEN17_RESULTS.md.
+
 ## Aggiornamento 0.4 — 12 ottobre 2026
 
 - Il vecchio progetto matrix_ia non è più presente; creato un ambiente .venv

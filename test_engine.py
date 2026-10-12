@@ -6,7 +6,7 @@ import os
 from types import SimpleNamespace
 from runtime_support import import_torch
 torch=import_torch()
-from safetensors.torch import save_model
+from safetensors.torch import save_model,load_file,save_file
 from transformers import Qwen3Config, Qwen3ForCausalLM
 from compressione import compress
 from engine import CompressedEngine
@@ -30,8 +30,18 @@ def main():
         source=root/'model.safetensors'; archive=root/'model.cmp'
         save_model(baseline,str(source))
         compress(source,archive,4096)
-        for mode in ('direct','ram'):
-            engine=CompressedEngine(archive,str(root),mode)
+        tensors=load_file(str(source))
+        names=list(tensors); mid=len(names)//2
+        mapping={}; parts={}
+        for i,subset in enumerate((names[:mid],names[mid:])):
+            part=root/f'part{i}.safetensors'; packed=root/f'part{i}.cmp'
+            save_file({name:tensors[name] for name in subset},str(part)); compress(part,packed,4096)
+            parts[part.name]=packed.name
+            mapping.update({name:part.name for name in subset})
+        manifest=root/'model.cmpmodel.json'
+        manifest.write_text(json.dumps({'format':'cmp-sharded-v1','shards':parts,'weight_map':mapping}))
+        for mode,chosen in (('direct',archive),('ram',archive),('direct',manifest),('ram',manifest)):
+            engine=CompressedEngine(chosen,str(root),mode)
             # Safetensors save_model may choose lm_head as the canonical tied weight.
             with torch.inference_mode():
                 ids=torch.tensor([[1,2,3]])
@@ -42,7 +52,9 @@ def main():
                 actual2=engine.model(input_ids=torch.tensor([[4]]),past_key_values=actual.past_key_values,use_cache=True,logits_to_keep=1)
                 torch.testing.assert_close(actual2.logits,ref2.logits,rtol=0,atol=0)
             if mode=='direct': assert all(p.device.type=='meta' for p in engine.model.parameters())
-            else: assert all(p.device.type=='cpu' for p in engine.model.parameters())
+            else:
+                assert all(p.device.type=='cpu' for p in engine.model.parameters())
+                assert engine.model.lm_head.weight is engine.model.model.embed_tokens.weight
             class TestTokenizer:
                 length=600
                 def apply_chat_template(self,*args,**kwargs): return 'test'
@@ -60,6 +72,6 @@ def main():
             result=engine.generate([{'role':'user','content':'test'}],max_tokens=4,context_window=128)
             assert result['tokens']<=1 and result['context_limited']
             engine.close()
-            print(f'{mode}: logits identici, prompt da 600 token accettato, limite di contesto rispettato.',flush=True)
+            print(f'{mode} {chosen.name}: logits identici, prompt da 600 token accettato, limite di contesto rispettato.',flush=True)
 
 if __name__=='__main__': main()
