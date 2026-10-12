@@ -63,6 +63,11 @@ of silently switching to a Python without inference packages. The program
 no longer depends on another Desktop project.
 The DLL bootstrap explicitly loads the Visual C++ runtime before Torch,
 including when launched with a clean Windows PATH.
+The llama.cpp child process also receives the available local runtime DLL
+directories in its own PATH. Keep the complete official `runtime/llama`
+package together; copying only `llama-server.exe` is insufficient. This does
+not change the system PATH. See [VALIDAZIONE.md](VALIDAZIONE.md) for the
+Windows-only PATH regression and full Qwen3-4B startup check.
 
 ## Set up on another machine
 

@@ -1,5 +1,21 @@
 # Verifiche della versione 0.2
 
+## Correzione avvio llama.cpp — 13 ottobre 2026
+
+- Riprodotto l’errore `0xC0000135` con `llama-server.exe --version` e PATH
+  limitato a Windows/System32 e Windows. Le DLL Visual C++ erano presenti nelle
+  dipendenze locali ma non venivano cercate dal processo nativo separato.
+- Il processo figlio riceve ora le cartelle delle DLL disponibili e la propria
+  cartella del runtime. Nessuna modifica al PATH di sistema. Gli errori DLL o
+  di architettura hanno un messaggio distinto dall’annullamento dell’utente.
+- Ventiquattro test automatici superati, inclusa l’esecuzione del runtime
+  ufficiale con PATH Windows minimo. Il test nativo viene saltato quando il
+  pacchetto facoltativo non è installato.
+- Servizio reale riavviato con PATH Windows minimo; Qwen3-4B Q4_K_M ha
+  completato la richiesta “Rispondi esattamente con la parola: PRONTO”.
+  Risposta `PRONTO`, 4 token, contesto 1.024; caricamento iniziale 20,14 s e
+  generazione 1,57 s. È una verifica dell’avvio, non un benchmark di qualità.
+
 ## Modello Qwen3-1.7B e rilascio RAM — 12 ottobre 2026
 
 - Download del checkpoint ufficiale verificato con i SHA-256 upstream; le due

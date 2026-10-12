@@ -15,7 +15,7 @@ class NativeEngine:
     def __init__(self,row,status,stop,context_window=1024):
         init_started=time.perf_counter()
         self.context_window=validate_context(context_window)
-        from runtime_support import prepare_runtime
+        from runtime_support import prepare_runtime,spawn_native
         prepare_runtime()
         from transformers import AutoTokenizer
         self.tokenizer=AutoTokenizer.from_pretrained(row['config_dir'],local_files_only=True)
@@ -24,10 +24,22 @@ class NativeEngine:
         self.base=f'http://127.0.0.1:{port}'
         log=Path(row['executable']).parent/'native.log';self.log=log.open('ab')
         args=[row['executable'],'-m',row['archive'],'--host','127.0.0.1','--port',str(port),'-c',str(self.context_window),'-t','4','-ngl','0','--parallel','1','--no-webui','--jinja','--chat-template-kwargs','{"enable_thinking":false}']
-        self.process=subprocess.Popen(args,stdout=self.log,stderr=self.log,creationflags=subprocess.CREATE_NO_WINDOW if os.name=='nt' else 0)
+        try:self.process=spawn_native(args,stdout=self.log,stderr=self.log)
+        except OSError as error:
+            self.log.close()
+            raise RuntimeError('Impossibile avviare llama.cpp: '+str(error)) from error
         self.status('Preparazione motore quantizzato llama.cpp…')
         for _ in range(180):
-            if stop.is_set() or self.process.poll() is not None:self.close();raise InterruptedError('Avvio motore interrotto. Dettagli in runtime/llama/native.log.')
+            if stop.is_set():self.close();raise InterruptedError('Avvio motore annullato.')
+            code=self.process.poll()
+            if code is not None:
+                self.close()
+                status_code=code & 0xffffffff
+                if status_code==0xc0000135:
+                    raise RuntimeError('llama.cpp non trova una DLL del runtime Windows (0xC0000135). Verifica runtime/llama e il Microsoft Visual C++ Redistributable x64. Dettagli in runtime/llama/native.log.')
+                if status_code==0xc000007b:
+                    raise RuntimeError('llama.cpp ha caricato una DLL di architettura incompatibile (0xC000007B). Servono runtime e DLL x64.')
+                raise RuntimeError(f'llama.cpp si è chiuso durante l’avvio (0x{status_code:08X}). Dettagli in runtime/llama/native.log.')
             try:
                 with urllib.request.urlopen(self.base+'/health',timeout=1) as response:
                     if response.status==200:
