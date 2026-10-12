@@ -1,5 +1,26 @@
 # Verifiche della versione 0.2
 
+## Aggiornamento 0.4 — 12 ottobre 2026
+
+- Il vecchio progetto matrix_ia non è più presente; creato un ambiente .venv
+  dentro Compressione con Torch CPU 2.14.1, Transformers 4.57.6 e psutil 7.2.2.
+- Configurazione e tokenizer del checkpoint Qwen3-0.6B recuperati dal repository
+  ufficiale alla revisione originaria; l’archivio dei pesi resta quello esistente.
+- Avvia.cmd preferisce l’ambiente locale e verifica le dipendenze. Configura.cmd
+  consente di ricrearlo/ripararlo senza dipendere da un altro progetto Desktop.
+- Dieci test automatici superati: API, compressione, limiti di contesto e scelta
+  dell’ambiente. Verificati rifiuto degli ambienti incompleti e contesto condiviso
+  fra prompt e risposta.
+- Qwen3 di riferimento: logits identici su prefill e token successivo; generazione
+  con un prompt sintetico di 600 token accettata con contesto 1.024 e rifiutata
+  con 512. Risposta accorciata correttamente al raggiungimento del limite.
+  Verificato in modalità direct e RAM.
+- Il servizio reale avviato dal CMD segnala tutte le dipendenze disponibili e
+  ha completato una generazione di 128 token. La prova HTTP aggiuntiva con prompt
+  lungo è stata annullata dall’interfaccia, quindi non viene riportata come passata.
+- Contesto ora configurabile da 128 a 8.192 token (default 1.024), nelle API con
+  context_window e nell’interfaccia con il campo Limite di contesto.
+
 ## Aggiornamento 0.3 — 5 ottobre 2026
 
 - Bootstrap Torch riuscito con PATH limitato a Windows/System32, senza dipendere

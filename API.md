@@ -1,4 +1,4 @@
-# API v0.3
+# API v0.4
 
 Il servizio ascolta per impostazione predefinita su `127.0.0.1:8765`.
 La chiave persistente è in `api-key.txt`; la scheda API dell’interfaccia mostra
@@ -24,7 +24,8 @@ Il modello locale già registrato è `qwen3-0.6b-cmp`.
   "max_tokens": 24,
   "temperature": 0,
   "stream": false,
-  "compression_mode": "direct"
+  "compression_mode": "direct",
+  "context_window": 2048
 }
 ```
 
@@ -40,7 +41,10 @@ uno stream e il server rileva la disconnessione, annulla la relativa generazione
 
 Supportati: messaggi testuali `system`, `user`, `assistant`; una risposta;
 generazione deterministica `temperature=0`; massimo 128 token di risposta e
-512 token di contesto. Non supportati: tools, immagini, audio, JSON strutturato,
+contesto configurabile da 128 a 8.192 token (default 1.024). Il contesto comprende
+conversazione, template e risposta. Se il prompt lascia meno spazio del richiesto,
+la risposta viene accorciata; un prompt che riempie il contesto viene rifiutato
+con un messaggio che indica i token effettivi. Non supportati: tools, immagini, audio, JSON strutturato,
 embeddings e generazione multipla. Le opzioni non implementate non costituiscono
 garanzie di compatibilità completa con qualsiasi prodotto.
 

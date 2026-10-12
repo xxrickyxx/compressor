@@ -2,6 +2,8 @@ import json
 from pathlib import Path
 import shutil
 import tempfile
+import os
+from types import SimpleNamespace
 from runtime_support import import_torch
 torch=import_torch()
 from safetensors.torch import save_model
@@ -12,7 +14,9 @@ from engine import CompressedEngine
 def main():
     torch.set_num_threads(2)
     torch.manual_seed(123)
-    tokenizer_dir=next((Path.home()/'Desktop/matrix_ia/cache/hub/models--Qwen--Qwen3-0.6B/snapshots').glob('*'))
+    tokenizer_dir=Path(os.environ.get('COMP_TEST_TOKENIZER',str(Path(__file__).parent/'models/qwen3-0.6b')))
+    if not tokenizer_dir.exists():
+        tokenizer_dir=next((Path.home()/'Desktop/matrix_ia/cache/hub/models--Qwen--Qwen3-0.6B/snapshots').glob('*'))
     with tempfile.TemporaryDirectory() as temp:
         root=Path(temp)
         config=Qwen3Config(vocab_size=64,hidden_size=32,intermediate_size=64,num_hidden_layers=2,num_attention_heads=2,num_key_value_heads=1,head_dim=16,tie_word_embeddings=True)
@@ -39,7 +43,23 @@ def main():
                 torch.testing.assert_close(actual2.logits,ref2.logits,rtol=0,atol=0)
             if mode=='direct': assert all(p.device.type=='meta' for p in engine.model.parameters())
             else: assert all(p.device.type=='cpu' for p in engine.model.parameters())
+            class TestTokenizer:
+                length=600
+                def apply_chat_template(self,*args,**kwargs): return 'test'
+                def __call__(self,*args,**kwargs):
+                    ids=torch.ones((1,self.length),dtype=torch.long)
+                    return SimpleNamespace(input_ids=ids,attention_mask=torch.ones_like(ids))
+                def decode(self,tokens,**kwargs): return ','.join(str(t) for t in tokens)
+            engine.tokenizer=TestTokenizer()
+            result=engine.generate([{'role':'user','content':'test'}],max_tokens=1,context_window=1024)
+            assert result['prompt_tokens']==600 and result['context_used_tokens']<=1024
+            try: engine.generate([{'role':'user','content':'test'}],max_tokens=1,context_window=512)
+            except ValueError: pass
+            else: raise AssertionError('Un prompt fuori contesto deve essere rifiutato.')
+            engine.tokenizer.length=127
+            result=engine.generate([{'role':'user','content':'test'}],max_tokens=4,context_window=128)
+            assert result['tokens']<=1 and result['context_limited']
             engine.close()
-            print(f'{mode}: logits prefill e token successivo identici al modello originale.',flush=True)
+            print(f'{mode}: logits identici, prompt da 600 token accettato, limite di contesto rispettato.',flush=True)
 
 if __name__=='__main__': main()

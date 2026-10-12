@@ -7,6 +7,7 @@ import time
 from pathlib import Path
 from compressione import Archive
 from runtime_support import import_torch
+from context_limits import DEFAULT_CONTEXT,validate_context,generation_budget
 
 class CompressedWeights:
     def __init__(self, path):
@@ -132,7 +133,7 @@ class CompressedEngine:
             self.loaded.discard(prefix)
         return hook
 
-    def generate(self,messages,max_tokens=64,on_text=None):
+    def generate(self,messages,max_tokens=64,on_text=None,context_window=DEFAULT_CONTEXT):
         torch=import_torch()
         import psutil
         process=psutil.Process()
@@ -143,9 +144,9 @@ class CompressedEngine:
             while not monitor_done.wait(.1): peak[0]=max(peak[0],process.memory_info().rss)
         text = self.tokenizer.apply_chat_template(messages,tokenize=False,add_generation_prompt=True,enable_thinking=False)
         inputs = self.tokenizer(text,return_tensors='pt')
-        if inputs.input_ids.shape[1] > 512:
-            monitor_done.set()
-            raise ValueError('Conversazione troppo lunga (massimo 512 token). Inizia una nuova chat.')
+        context_window=validate_context(context_window,self.model.config.max_position_embeddings)
+        requested_max_tokens=max_tokens
+        max_tokens=generation_budget(inputs.input_ids.shape[1],max_tokens,context_window,self.model.config.max_position_embeddings)
         ids = inputs.input_ids
         mask = inputs.attention_mask
         past = None
@@ -180,6 +181,8 @@ class CompressedEngine:
                 'seconds':elapsed,'tokens_s':len(generated)/max(elapsed,0.001),
                 'weight_bytes_read':self.weights.bytes_read,'mode':self.mode,
                 'prompt_tokens':prompt_tokens,'finish_reason':finish_reason,
+                'context_window':context_window,'context_used_tokens':prompt_tokens+len(generated),
+                'context_limited':max_tokens<requested_max_tokens,
                 'rss_start_bytes':rss_start,'rss_peak_bytes':peak[0],
                 'decoded_weight_peak_bytes':self.decoded_peak_bytes}
 

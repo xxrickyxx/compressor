@@ -5,9 +5,10 @@ from runtime_support import import_torch
 from engine import CompressedEngine
 
 root=Path(__file__).resolve().parent
-rows=json.loads((root/'prove_modelli/risultati.json').read_text(encoding='utf8'))
+registry=root/'models.json'
+rows=json.loads((registry if registry.exists() else root/'prove_modelli/risultati.json').read_text(encoding='utf8'))
 row=next(r for r in rows if 'Qwen3' in r['source'])
-engine=CompressedEngine(row['archive'],str(Path(row['source']).parent),'direct',status=lambda text:print(text,flush=True))
+engine=CompressedEngine(row['archive'],row.get('config_dir',str(Path(row['source']).parent)),'direct',status=lambda text:print(text,flush=True))
 try:
     result=engine.generate([{'role':'user','content':'Scrivi soltanto la parola Ciao.'}],max_tokens=4)
     result['archive_bytes']=Path(row['archive']).stat().st_size

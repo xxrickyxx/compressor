@@ -1,4 +1,4 @@
-# Compressione 0.3
+# Compressione 0.4
 
 Apri **Avvia.cmd** con un doppio clic. Si apre una moderna interfaccia nel browser, servita soltanto su 127.0.0.1. La scheda Compressione permette di selezionare un file e comprimerlo, ricostruirlo o verificarlo. Mostra avanzamento, dimensioni, risparmio e tempo totale; verifica automaticamente ogni archivio appena creato. Il pulsante Annulla interrompe il lavoro al termine del blocco corrente. Se annulli durante la verifica finale, l’archivio già creato resta disponibile e puoi verificarlo successivamente.
 
@@ -16,14 +16,14 @@ C++ di Windows. La correzione è stata provata con PATH ridotto. Se queste
 librerie non sono installate né disponibili nel runtime locale, il messaggio
 indica di installare il Redistributable Visual C++ x64 ufficiale.
 
-La scheda Chat locale usa l’archivio del Qwen3-0.6B trovato in matrix_ia. Il motore supporta Qwen3 safetensors BF16/F16/F32: non supporta ancora BitNet o GGUF per l’inferenza.
+La scheda Chat locale usa l’archivio compresso Qwen3-0.6B già presente. L’ambiente è ora nella sottocartella .venv di Compressione; Configura.cmd lo crea o ripara e recupera i file di supporto ufficiali del checkpoint. La chat non dipende più da matrix_ia. Il motore supporta Qwen3 safetensors BF16/F16/F32: non supporta ancora BitNet o GGUF per l’inferenza.
 
 - **A strati:** legge gli intervalli dei tensori dall’archivio CMP, verifica i blocchi, decodifica i pesi dello strato, esegue il calcolo e libera i pesi. Non ricostruisce un file completo su disco. Deve rileggere i pesi per ogni token: può essere molto lento.
 - **Cache in RAM:** legge i pesi dall’archivio al primo uso e li mantiene in memoria. Richiede più RAM; il programma controlla la disponibilità prima di attivarla.
 
-Le operazioni matematiche usano tensori decodificati, non i byte zlib direttamente. Questo è un motore di inferenza con lettura da archivio, non calcolo su dati ancora compressi. Conserva la cache KV per la generazione e usa una decodifica deterministica. Il contesto è limitato a 512 token e le risposte a 128 token. “Nuova chat” azzera la conversazione.
+Le operazioni matematiche usano tensori decodificati, non i byte zlib direttamente. Questo è un motore di inferenza con lettura da archivio, non calcolo su dati ancora compressi. Conserva la cache KV per la generazione e usa una decodifica deterministica. Il campo **Limite di contesto** è regolabile da 128 a 8.192 token, con 1.024 come valore iniziale. Comprende la cronologia, il template e la risposta, che rimane limitata a 128 token e può essere accorciata per rispettare il contesto. “Nuova chat” azzera la conversazione. Contesti lunghi richiedono più memoria e tempo.
 
-Configurazione e tokenizer vengono letti dalla cartella originale di Qwen in matrix_ia; nessun download automatico. Torch e Transformers sono quelli già installati nell’ambiente di matrix_ia. Non spostare questa cartella se vuoi continuare a usare la chat. `server.log` contiene gli errori del servizio locale.
+Configurazione e tokenizer sono nella sottocartella models/qwen3-0.6b, esclusa da Git. Configura.cmd recupera questi asset dal repository ufficiale Qwen e installa le dipendenze; non riscarica i pesi. Avvia.cmd controlla le dipendenze prima di usare un interprete. `server.log`, `launch-error.log` e `setup.log` contengono eventuali errori.
 
 Il test `test_engine.py` confronta esattamente i logits del motore da archivio con un piccolo Qwen3 di riferimento, sia sul prompt sia sul token successivo con cache KV, nelle due modalità. Le basi per il caricamento a richiesta sono descritte nella [documentazione PyTorch](https://docs.pytorch.org/tutorials/recipes/recipes/module_load_state_dict_tips.html) e nella [documentazione Qwen3](https://huggingface.co/docs/transformers/model_doc/qwen3).
 

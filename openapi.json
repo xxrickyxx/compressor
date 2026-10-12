@@ -1,34 +1,332 @@
 {
   "openapi": "3.0.3",
-  "info": {"title": "Compressor API", "version": "0.3", "description": "Authenticated local lossless compression and experimental Qwen3 chat. One operation at a time."},
-  "servers": [{"url": "http://127.0.0.1:8765"}],
-  "security": [{"bearerAuth": []}],
+  "info": {
+    "title": "Compressor API",
+    "version": "0.4",
+    "description": "Authenticated local lossless compression and experimental Qwen3 chat. One operation at a time."
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:8765"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
   "components": {
-    "securitySchemes": {"bearerAuth": {"type": "http", "scheme": "bearer"}},
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    },
     "schemas": {
-      "Error": {"type": "object", "properties": {"error": {"type": "object", "properties": {"message": {"type": "string"}, "type": {"type": "string"}}}}},
-      "Message": {"type": "object", "required": ["role", "content"], "properties": {"role": {"type": "string", "enum": ["system", "user", "assistant"]}, "content": {"type": "string"}}},
-      "ChatRequest": {"type": "object", "required": ["model", "messages"], "properties": {
-        "model": {"type": "string", "example": "qwen3-0.6b-cmp"},
-        "messages": {"type": "array", "minItems": 1, "maxItems": 20, "items": {"$ref": "#/components/schemas/Message"}},
-        "max_tokens": {"type": "integer", "minimum": 1, "maximum": 128, "default": 48},
-        "temperature": {"type": "number", "enum": [0], "default": 0},
-        "stream": {"type": "boolean", "default": false},
-        "compression_mode": {"type": "string", "enum": ["direct", "ram"], "default": "direct"}
-      }},
-      "JobRequest": {"type": "object", "required": ["action", "source"], "properties": {"action": {"type": "string", "enum": ["compress", "extract", "verify"]}, "source": {"type": "string", "description": "Path on the server machine"}, "target": {"type": "string", "description": "Required for compress/extract; must not exist"}}},
-      "JobState": {"type": "object", "properties": {"job_id": {"type": "string"}, "busy": {"type": "boolean"}, "phase": {"type": "string"}, "progress": {"type": "number"}, "result": {"type": "object", "nullable": true}, "error": {"type": "string", "nullable": true}}}
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "message": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "Message": {
+        "type": "object",
+        "required": [
+          "role",
+          "content"
+        ],
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "system",
+              "user",
+              "assistant"
+            ]
+          },
+          "content": {
+            "type": "string"
+          }
+        }
+      },
+      "ChatRequest": {
+        "type": "object",
+        "required": [
+          "model",
+          "messages"
+        ],
+        "properties": {
+          "model": {
+            "type": "string",
+            "example": "qwen3-0.6b-cmp"
+          },
+          "messages": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 20,
+            "items": {
+              "$ref": "#/components/schemas/Message"
+            }
+          },
+          "max_tokens": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 128,
+            "default": 48
+          },
+          "temperature": {
+            "type": "number",
+            "enum": [
+              0
+            ],
+            "default": 0
+          },
+          "stream": {
+            "type": "boolean",
+            "default": false
+          },
+          "compression_mode": {
+            "type": "string",
+            "enum": [
+              "direct",
+              "ram"
+            ],
+            "default": "direct"
+          },
+          "context_window": {
+            "type": "integer",
+            "minimum": 128,
+            "maximum": 8192,
+            "default": 1024,
+            "description": "Total prompt plus generated answer token budget; also limited by the checkpoint."
+          }
+        }
+      },
+      "JobRequest": {
+        "type": "object",
+        "required": [
+          "action",
+          "source"
+        ],
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "compress",
+              "extract",
+              "verify"
+            ]
+          },
+          "source": {
+            "type": "string",
+            "description": "Path on the server machine"
+          },
+          "target": {
+            "type": "string",
+            "description": "Required for compress/extract; must not exist"
+          }
+        }
+      },
+      "JobState": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string"
+          },
+          "busy": {
+            "type": "boolean"
+          },
+          "phase": {
+            "type": "string"
+          },
+          "progress": {
+            "type": "number"
+          },
+          "result": {
+            "type": "object",
+            "nullable": true
+          },
+          "error": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      }
     }
   },
   "paths": {
-    "/health": {"get": {"security": [], "summary": "Service availability only", "responses": {"200": {"description": "Service available"}}}},
-    "/v1/models": {"get": {"summary": "List available chat model IDs", "responses": {"200": {"description": "OpenAI-style model list"}, "401": {"description": "Invalid API key"}}}},
-    "/v1/chat/completions": {"post": {"summary": "Generate a deterministic local chat completion", "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ChatRequest"}}}}, "responses": {
-      "200": {"description": "JSON completion with choices and usage, or SSE chunks ending with [DONE]. Errors after SSE starts are error events.", "content": {"application/json": {"schema": {"type": "object"}}, "text/event-stream": {"schema": {"type": "string"}}}},
-      "400": {"description": "Invalid request or inference failure"}, "401": {"description": "Invalid API key"}, "409": {"description": "Another operation is running"}
-    }}},
-    "/v1/jobs": {"post": {"summary": "Start an asynchronous file operation", "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JobRequest"}}}}, "responses": {"202": {"description": "Accepted; response includes id"}, "400": {"description": "Invalid request"}, "401": {"description": "Invalid API key"}, "409": {"description": "Busy"}}}},
-    "/v1/jobs/{id}": {"get": {"summary": "Read operation state", "parameters": [{"name": "id", "in": "path", "required": true, "schema": {"type": "string"}}], "responses": {"200": {"description": "State", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JobState"}}}}, "401": {"description": "Invalid API key"}, "404": {"description": "Unknown or expired operation"}}}},
-    "/v1/jobs/{id}/cancel": {"post": {"summary": "Request cancellation of the active operation", "parameters": [{"name": "id", "in": "path", "required": true, "schema": {"type": "string"}}], "requestBody": {"required": true, "content": {"application/json": {"schema": {"type": "object"}}}}, "responses": {"200": {"description": "Cancellation requested"}, "400": {"description": "Operation is not active"}, "401": {"description": "Invalid API key"}}}}
+    "/health": {
+      "get": {
+        "security": [],
+        "summary": "Service availability only",
+        "responses": {
+          "200": {
+            "description": "Service available"
+          }
+        }
+      }
+    },
+    "/v1/models": {
+      "get": {
+        "summary": "List available chat model IDs",
+        "responses": {
+          "200": {
+            "description": "OpenAI-style model list"
+          },
+          "401": {
+            "description": "Invalid API key"
+          }
+        }
+      }
+    },
+    "/v1/chat/completions": {
+      "post": {
+        "summary": "Generate a deterministic local chat completion",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "JSON completion with choices and usage, or SSE chunks ending with [DONE]. Errors after SSE starts are error events.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request or inference failure"
+          },
+          "401": {
+            "description": "Invalid API key"
+          },
+          "409": {
+            "description": "Another operation is running"
+          }
+        }
+      }
+    },
+    "/v1/jobs": {
+      "post": {
+        "summary": "Start an asynchronous file operation",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JobRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted; response includes id"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Invalid API key"
+          },
+          "409": {
+            "description": "Busy"
+          }
+        }
+      }
+    },
+    "/v1/jobs/{id}": {
+      "get": {
+        "summary": "Read operation state",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "State",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobState"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid API key"
+          },
+          "404": {
+            "description": "Unknown or expired operation"
+          }
+        }
+      }
+    },
+    "/v1/jobs/{id}/cancel": {
+      "post": {
+        "summary": "Request cancellation of the active operation",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Cancellation requested"
+          },
+          "400": {
+            "description": "Operation is not active"
+          },
+          "401": {
+            "description": "Invalid API key"
+          }
+        }
+      }
+    }
   }
 }

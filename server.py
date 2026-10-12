@@ -1,4 +1,5 @@
 import json
+import importlib.util
 import os
 from pathlib import Path
 import secrets
@@ -11,6 +12,7 @@ import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 from compressione import compress, decompress, Archive
+from context_limits import DEFAULT_CONTEXT,MAX_CONTEXT,validate_context
 
 ROOT=Path(__file__).resolve().parent
 TOKEN=secrets.token_urlsafe(32)
@@ -46,6 +48,11 @@ def models():
         row.setdefault('id','qwen3-0.6b-cmp' if 'Qwen3' in row['source'] else Path(row['archive']).name)
         row.setdefault('label','Qwen3 · 0,6B' if 'Qwen' in row['source'] else ('BitNet · GGUF' if '.gguf' in row['source'] else 'BitNet · safetensors' if 'bitnet' in row['source'] else 'Whisper tiny'))
         row['chat_supported']=(row.get('model_type')=='qwen3' or 'Qwen3' in row['source']) and Path(row['archive']).exists()
+        row['config_dir']=row.get('config_dir',str(Path(row['source']).parent))
+        try:
+            config=json.loads((Path(row['config_dir'])/'config.json').read_text(encoding='utf8'))
+            row['max_context_tokens']=min(MAX_CONTEXT,config['max_position_embeddings'])
+        except (OSError,ValueError,KeyError): row['max_context_tokens']=MAX_CONTEXT
     return rows
 
 def launch(data):
@@ -80,14 +87,15 @@ def worker(data):
                 if mode=='ram' and psutil.virtual_memory().available < row['original_bytes']+700*1024*1024:
                     raise ValueError('RAM libera insufficiente per la cache completa. Usa la modalità a strati o chiudi altri programmi.')
                 update(phase='Preparazione motore Qwen3…')
-                ENGINE=CompressedEngine(row['archive'],str(Path(row['source']).parent),mode,
+                ENGINE=CompressedEngine(row['archive'],row['config_dir'],mode,
                         status=lambda text:update(phase=text),stop=STOP)
                 ENGINE_KEY=key
             messages=data.get('messages',[])
             if not messages or len(messages)>20 or any(m.get('role') not in ('system','user','assistant') or not isinstance(m.get('content'),str) for m in messages):
                 raise ValueError('Conversazione non valida.')
-            if sum(len(m['content']) for m in messages)>6000: raise ValueError('Inizia una nuova chat: contesto troppo lungo.')
-            result=ENGINE.generate(messages,max_tokens=max(1,min(128,int(data.get('max_tokens',48)))),on_text=lambda text:update(answer=text))
+            if sum(len(m['content']) for m in messages)>131072: raise ValueError('Conversazione troppo grande.')
+            context_window=validate_context(data.get('context_window',DEFAULT_CONTEXT))
+            result=ENGINE.generate(messages,max_tokens=max(1,min(128,int(data.get('max_tokens',48)))),on_text=lambda text:update(answer=text),context_window=context_window)
             result['model']=row['label']
         else:
             src=data['source']; dst=data.get('target','')
@@ -127,7 +135,9 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header('Cache-Control','no-store'); self.end_headers(); self.wfile.write(raw)
     def do_GET(self):
         path=urlparse(self.path).path
-        if path=='/health': self.send({'status':'ok','version':'0.3'}); return
+        if path=='/health':
+            missing=[name for name in ('torch','transformers','psutil','safetensors') if importlib.util.find_spec(name) is None]
+            self.send({'status':'ok','version':'0.4','inference_ready':not missing,'missing_dependencies':missing}); return
         if path.startswith('/v1/') or path=='/openapi.json':
             if not self.authorized(): self.send({'error':{'message':'Chiave API non valida','type':'authentication_error'}},401); return
             if path=='/v1/models':
@@ -159,7 +169,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send({'error':'Accesso non autorizzato'},403); return
         try:
             length=int(self.headers.get('Content-Length',0))
-            if not 0<length<=40000: raise ValueError('Richiesta troppo grande.')
+            if not 0<length<=1048576: raise ValueError('Richiesta troppo grande.')
             data=json.loads(self.rfile.read(length))
             if self.path=='/api/run': job_id=launch(data); self.send({'ok':True,'job_id':job_id})
             elif self.path=='/api/stop': STOP.set(); self.send({'ok':True})
@@ -187,7 +197,7 @@ class Handler(BaseHTTPRequestHandler):
         job_id=None
         try:
             length=int(self.headers.get('Content-Length',0))
-            if not 0<length<=40000: raise ValueError('Richiesta troppo grande.')
+            if not 0<length<=1048576: raise ValueError('Richiesta troppo grande.')
             data=json.loads(self.rfile.read(length))
             if not isinstance(data,dict): raise ValueError('Serve un oggetto JSON.')
             if self.path=='/v1/jobs':
@@ -205,7 +215,8 @@ class Handler(BaseHTTPRequestHandler):
             messages=data.get('messages')
             if not isinstance(messages,list) or not messages or len(messages)>20 or any(not isinstance(m,dict) or m.get('role') not in ('system','user','assistant') or not isinstance(m.get('content'),str) for m in messages):
                 raise ValueError('messages deve contenere messaggi system/user/assistant con content testuale.')
-            if sum(len(m['content']) for m in messages)>6000: raise ValueError('Conversazione troppo lunga.')
+            if sum(len(m['content']) for m in messages)>131072: raise ValueError('Conversazione troppo grande.')
+            context_window=validate_context(data.get('context_window',DEFAULT_CONTEXT))
             mode=data.get('compression_mode','direct')
             if mode not in ('direct','ram'): raise ValueError('compression_mode deve essere direct o ram.')
             maximum=data.get('max_tokens',data.get('max_completion_tokens',48))
@@ -214,7 +225,7 @@ class Handler(BaseHTTPRequestHandler):
             if any(data.get(k) for k in ('tools','tool_choice','response_format')): raise ValueError('Tools e formati strutturati non sono ancora supportati.')
             if data.get('n',1)!=1: raise ValueError('Questa versione supporta solo n=1.')
             if not isinstance(data.get('stream',False),bool): raise ValueError('stream deve essere booleano.')
-            job_id=launch({'action':'chat','archive':row['archive'],'messages':messages,'mode':mode,'max_tokens':maximum})
+            job_id=launch({'action':'chat','archive':row['archive'],'messages':messages,'mode':mode,'max_tokens':maximum,'context_window':context_window})
             created=int(time.time()); response_id='chatcmpl-'+job_id
             streaming=data.get('stream',False)
             sent=''
@@ -263,7 +274,7 @@ def main():
     API_KEY=get_api_key()
     server=ThreadingHTTPServer((options.host,options.port),Handler)
     url=f'http://127.0.0.1:{server.server_port}/'
-    (ROOT/'runtime.json').write_text(json.dumps({'url':url,'pid':os.getpid(),'version':'0.3'}),encoding='utf8')
+    (ROOT/'runtime.json').write_text(json.dumps({'url':url,'pid':os.getpid(),'version':'0.4'}),encoding='utf8')
     if not options.no_browser: webbrowser.open(url)
     print(url,flush=True)
     server.serve_forever()

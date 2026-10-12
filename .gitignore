@@ -8,6 +8,8 @@ prove_modelli/
 *.log
 runtime.json
 models.json
+models/
+*.download
 api-key.txt
 runtime/windows/
 *.jpg

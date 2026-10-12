@@ -54,8 +54,11 @@ see [MEMORY.md](MEMORY.md) for sampling limitations and reproduction details.
 ## Run on this Windows installation
 
 Double-click `Avvia.cmd`. It starts the local service and opens the browser.
-The installed environment in `Desktop/matrix_ia/.venv` supplies Torch and
-Transformers. The launcher uses the locally installed Codex Python to start it.
+The dedicated `.venv` inside Compressor supplies Torch, Transformers, psutil
+and safetensors. For first setup or repair, double-click `Configura.cmd`.
+The launcher checks dependencies and refuses incomplete interpreters instead
+of silently switching to a Python without inference packages. The program
+no longer depends on another Desktop project.
 The DLL bootstrap explicitly loads the Visual C++ runtime before Torch,
 including when launched with a clean Windows PATH.
 
@@ -64,8 +67,9 @@ including when launched with a clean Windows PATH.
 Use Python 3.11 or 3.12, create a virtual environment, then:
 
 ```sh
-python -m pip install -r requirements.txt
-python server.py --port 8765
+python setup_env.py
+# Windows:
+.venv/Scripts/python.exe server.py --port 8765
 ```
 
 On Windows, install Microsoft's supported Visual C++ Redistributable x64 if
@@ -77,8 +81,10 @@ python compressione.py comprimi model.safetensors model.cmp
 python compressione.py verifica model.cmp
 ```
 
-Register the checkpoint using `register_model.py` (see API.md). No automatic
-model downloads occur. Direct chat currently supports Qwen3 only; GGUF and
+Register the checkpoint using `register_model.py` (see API.md). No model weight
+downloads occur. Configura.cmd can recover official config/tokenizer assets
+for the known Qwen3-0.6B archive if the former Desktop project was removed.
+Direct chat currently supports Qwen3 only; GGUF and
 BitNet archives can be compressed but are not supported for direct inference.
 
 ## API
@@ -107,6 +113,15 @@ use `python server.py --host YOUR_LAN_IP --port 8765 --no-browser`.
 The web UI and internal file picker remain loopback-only; external API calls
 require the secret. Use a TLS reverse proxy for deployments across untrusted
 networks; this server does not implement TLS.
+
+## Context window
+
+The context window is adjustable in the chat UI from **128 to 8,192 tokens**
+(default 1,024). It includes the full chat template/history and the generated
+answer. Increasing this limit does not preallocate the whole window, but long
+prompts need more memory and CPU time. API clients can pass
+`extra_body={"context_window": 2048}`. If little room remains, the response is
+shortened; prompts that fill the window are rejected without silent truncation.
 
 ## Tests
 

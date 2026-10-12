@@ -32,10 +32,11 @@ class Tests(unittest.TestCase):
     def test_chat_and_stream(self):
         row={'id':'qwen3-0.6b-cmp','chat_supported':True,'archive':'test.cmp'}
         def fake_worker(data):
+            self.assertEqual(data['context_window'],2048)
             server.update(answer='Ciao',result={'text':'Ciao','tokens':2,'prompt_tokens':3,'finish_reason':'stop'},busy=False)
         with patch.object(server,'models',return_value=[row]),patch.object(server,'worker',fake_worker):
             with self.request('/v1/models') as r: self.assertEqual(json.load(r)['data'][0]['id'],row['id'])
-            payload={'model':row['id'],'messages':[{'role':'system','content':'Italiano'},{'role':'user','content':'Ciao'}],'max_tokens':2}
+            payload={'model':row['id'],'messages':[{'role':'system','content':'Italiano'},{'role':'user','content':'Ciao'}],'max_tokens':2,'context_window':2048}
             with self.request('/v1/chat/completions',payload) as r:
                 result=json.load(r)
                 self.assertEqual(result['choices'][0]['message']['content'],'Ciao')
@@ -47,6 +48,10 @@ class Tests(unittest.TestCase):
                 events=[json.loads(line[6:]) for line in raw.splitlines() if line.startswith('data: {')]
                 self.assertEqual(''.join(e['choices'][0]['delta'].get('content','') for e in events),'Ciao')
             payload['temperature']=.5
+            with self.assertRaises(urllib.error.HTTPError) as caught: self.request('/v1/chat/completions',payload)
+            self.assertEqual(caught.exception.code,400)
+            payload.pop('temperature')
+            payload['context_window']=True
             with self.assertRaises(urllib.error.HTTPError) as caught: self.request('/v1/chat/completions',payload)
             self.assertEqual(caught.exception.code,400)
     def test_actual_compression_job(self):
