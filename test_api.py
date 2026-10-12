@@ -29,6 +29,19 @@ class Tests(unittest.TestCase):
         self.assertEqual(caught.exception.code,401)
         with self.request('/health',key=False) as r: self.assertEqual(json.load(r)['status'],'ok')
         with self.assertRaises(urllib.error.HTTPError): self.request('/api/integration')
+    def test_expired_ui_session_is_rejected_before_action(self):
+        with patch.object(server,'launch') as launch:
+            request=urllib.request.Request(self.url+'/api/run',data=b'{"action":"chat"}',headers={'X-App-Token':'old-session','Content-Type':'application/json'})
+            with self.assertRaises(urllib.error.HTTPError) as caught: urllib.request.urlopen(request)
+            self.assertEqual(caught.exception.code,403)
+            self.assertEqual(json.load(caught.exception)['code'],'app_session_expired')
+            launch.assert_not_called()
+        with self.request('/',key=False) as response:
+            self.assertEqual(response.headers['Cache-Control'],'no-store')
+            self.assertIn("const TOKEN='"+server.TOKEN+"'",response.read().decode())
+        with self.request('/session_api.js',key=False) as response:
+            self.assertEqual(response.headers['Cache-Control'],'no-store')
+            self.assertIn('createSessionApi',response.read().decode())
     def test_chat_and_stream(self):
         row={'id':'qwen3-0.6b-cmp','chat_supported':True,'archive':'test.cmp'}
         def fake_worker(data):

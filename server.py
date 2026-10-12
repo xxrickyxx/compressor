@@ -223,9 +223,9 @@ class Handler(BaseHTTPRequestHandler):
         if path=='/':
             raw=(ROOT/'index.html').read_text(encoding='utf8').replace('__TOKEN__',TOKEN).encode('utf8')
             self.send_response(200); self.send_header('Content-Type','text/html; charset=utf-8'); self.send_header('Cache-Control','no-store'); self.end_headers(); self.wfile.write(raw)
-        elif path=='/i18n.js':
-            raw=(ROOT/'i18n.js').read_bytes(); self.send_response(200); self.send_header('Content-Type','text/javascript; charset=utf-8'); self.end_headers(); self.wfile.write(raw)
-        elif self.headers.get('X-App-Token')!=TOKEN: self.send({'error':'Accesso non autorizzato'},403)
+        elif path in ('/i18n.js','/session_api.js'):
+            raw=(ROOT/path[1:]).read_bytes(); self.send_response(200); self.send_header('Content-Type','text/javascript; charset=utf-8'); self.send_header('Cache-Control','no-store'); self.end_headers(); self.wfile.write(raw)
+        elif self.headers.get('X-App-Token')!=TOKEN: self.send({'error':'Accesso non autorizzato','code':'app_session_expired'},403)
         elif path=='/api/state':
             import psutil
             with LOCK:
@@ -253,7 +253,7 @@ class Handler(BaseHTTPRequestHandler):
             self.public_post(); return
         if not self.local_client(): self.send({'error':'Accesso solo locale'},403); return
         if self.headers.get('X-App-Token')!=TOKEN:
-            self.send({'error':'Accesso non autorizzato'},403); return
+            self.send({'error':'Accesso non autorizzato','code':'app_session_expired'},403); return
         try:
             length=int(self.headers.get('Content-Length',0))
             if not 0<length<=1048576: raise ValueError('Richiesta troppo grande.')

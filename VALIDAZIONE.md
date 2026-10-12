@@ -1,5 +1,20 @@
 # Verifiche della versione 0.2
 
+## Riconnessione della pagina dopo un riavvio — 13 ottobre 2026
+
+- Riprodotto “Accesso non autorizzato” nella pagina aperta prima del riavvio:
+  il token temporaneo della pagina non coincideva più con quello del servizio.
+- Le API dell’interfaccia distinguono ora la sessione scaduta. Il client
+  recupera il nuovo token dalla pagina locale senza cache e ripete una sola
+  volta la richiesta. Le richieste concorrenti condividono il rinnovo;
+  altri errori non avviano tentativi automatici.
+- Test JavaScript: rinnovo concorrente, singola esecuzione del POST rifiutato,
+  conservazione del token aggiornato, errori estranei e limite dei tentativi.
+  Test HTTP: un token scaduto non avvia il lavoro; pagina e script senza cache.
+- Verifica nella pagina reale lasciata aperta durante un secondo riavvio:
+  testo nel campo messaggio conservato, stato “Pronto” e comando “Libera RAM
+  del modello” riuscito senza ricaricare la pagina. Cronologia conservata.
+
 ## Correzione avvio llama.cpp — 13 ottobre 2026
 
 - Riprodotto l’errore `0xC0000135` con `llama-server.exe --version` e PATH

@@ -44,3 +44,5 @@ Il gestionale è un’applicazione locale di base. Non include pagamenti, recupe
 Il GGUF quantizzato viene letto da llama.cpp ed è una rappresentazione a precisione ridotta. Questo percorso non usa il decoder CMP e non prova un vantaggio esclusivo della nostra compressione lossless. La modalità CMP BF16 resta disponibile separatamente.
 
 Su Windows, il processo llama.cpp riceve anche le cartelle locali delle DLL Visual C++ disponibili (`runtime/windows`, runtime Python e dipendenze Codex già presenti). Il percorso di sistema resta invariato. Conserva insieme l’intero pacchetto ufficiale in `runtime/llama`: il solo eseguibile non basta. Se le DLL Visual C++ non sono presenti nel computer, installa il Redistributable x64 indicato nel README. Gli errori del caricatore vengono riportati nell’app con il codice Windows, senza lasciare una finestra di errore che blocchi il lavoro.
+
+Se il servizio viene riavviato mentre la pagina è aperta, l’interfaccia rinnova automaticamente la propria sessione locale, conservando il testo scritto. Le API esterne continuano a richiedere la chiave API: il rinnovo riguarda soltanto l’interfaccia del programma.
