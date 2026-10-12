@@ -29,13 +29,13 @@ def main():
         baseline.config._attn_implementation='eager'
         source=root/'model.safetensors'; archive=root/'model.cmp'
         save_model(baseline,str(source))
-        compress(source,archive,4096)
+        compress(source,archive,4096,codec=os.environ.get("COMP_TEST_CODEC","zlib"))
         tensors=load_file(str(source))
         names=list(tensors); mid=len(names)//2
         mapping={}; parts={}
         for i,subset in enumerate((names[:mid],names[mid:])):
             part=root/f'part{i}.safetensors'; packed=root/f'part{i}.cmp'
-            save_file({name:tensors[name] for name in subset},str(part)); compress(part,packed,4096)
+            save_file({name:tensors[name] for name in subset},str(part)); compress(part,packed,4096,codec=os.environ.get("COMP_TEST_CODEC","zlib"))
             parts[part.name]=packed.name
             mapping.update({name:part.name for name in subset})
         manifest=root/'model.cmpmodel.json'
@@ -63,6 +63,11 @@ def main():
                     return SimpleNamespace(input_ids=ids,attention_mask=torch.ones_like(ids))
                 def decode(self,tokens,**kwargs): return ','.join(str(t) for t in tokens)
             engine.tokenizer=TestTokenizer()
+            from unittest.mock import patch
+            with patch('psutil.virtual_memory',return_value=SimpleNamespace(available=1)):
+                try: engine.generate([{'role':'user','content':'test'}],max_tokens=1,context_window=1024)
+                except ValueError as error: assert 'RAM libera insufficiente' in str(error)
+                else: raise AssertionError('Prompt impossibile per RAM deve essere rifiutato prima del calcolo.')
             result=engine.generate([{'role':'user','content':'test'}],max_tokens=1,context_window=1024)
             assert result['prompt_tokens']==600 and result['context_used_tokens']<=1024
             try: engine.generate([{'role':'user','content':'test'}],max_tokens=1,context_window=512)

@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Compressor API",
-    "version": "0.4",
+    "version": "0.6",
     "description": "Authenticated local lossless compression and experimental Qwen3 chat. One operation at a time."
   },
   "servers": [
@@ -73,7 +73,7 @@
           "messages": {
             "type": "array",
             "minItems": 1,
-            "maxItems": 20,
+            "maxItems": 200,
             "items": {
               "$ref": "#/components/schemas/Message"
             }
@@ -81,7 +81,7 @@
           "max_tokens": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 128,
+            "maximum": 4096,
             "default": 48
           },
           "temperature": {
@@ -134,6 +134,15 @@
           "target": {
             "type": "string",
             "description": "Required for compress/extract; must not exist"
+          },
+          "codec": {
+            "type": "string",
+            "enum": [
+              "zlib",
+              "zstd"
+            ],
+            "default": "zlib",
+            "description": "Compression only: zlib CMP v1 or Zstandard CMP v2."
           }
         }
       },

@@ -199,6 +199,20 @@ class CompressedEngine:
         past = None
         generated = []
         prompt_tokens=ids.shape[1]
+        config=self.model.config
+        # Eager attention materializes quadratic score/softmax buffers. Reject
+        # clearly impossible prompts before allocating them, especially at 4B.
+        head_dim=getattr(config,'head_dim',config.hidden_size//config.num_attention_heads)
+        kv_bytes=2*config.num_hidden_layers*config.num_key_value_heads*head_dim*2*(prompt_tokens+max_tokens)
+        attention_bytes=config.num_attention_heads*prompt_tokens*prompt_tokens*8
+        numeric_resident=sum(p.numel()*p.element_size() for p in self.model.parameters() if p.device.type!='meta')
+        weight_bytes=sum(item['data_offsets'][1]-item['data_offsets'][0] for name,item in self.weights.header.items() if name!='__metadata__')
+        if config.tie_word_embeddings and 'lm_head.weight' in self.weights.header and 'model.embed_tokens.weight' in self.weights.header:
+            item=self.weights.header['lm_head.weight']; weight_bytes-=item['data_offsets'][1]-item['data_offsets'][0]
+        needed_weights=max(0,weight_bytes-numeric_resident) if self.mode=='ram' else 0
+        estimate=kv_bytes+attention_bytes+needed_weights+256*1024*1024
+        if estimate>psutil.virtual_memory().available:
+            raise ValueError('RAM libera insufficiente per questo prompt e contesto. Riduci contesto/risposta, libera altri modelli o usa la modalità a strati. Stima prudenziale aggiuntiva: '+str(round(estimate/1e9,2))+' GB.')
         finish_reason='length'
         started = time.perf_counter()
         eos = self.model.generation_config.eos_token_id

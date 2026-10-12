@@ -20,7 +20,7 @@ def restore_assets():
     for row in rows:
         repo=row.get('hf_repo')
         if not repo and 'models--Qwen--Qwen3-0.6B' in row.get('source',''): repo='Qwen/Qwen3-0.6B'
-        if repo not in ('Qwen/Qwen3-0.6B','Qwen/Qwen3-1.7B'): continue
+        if repo not in ('Qwen/Qwen3-0.6B','Qwen/Qwen3-1.7B','Qwen/Qwen3-4B'): continue
         if not Path(row['archive']).is_file(): continue
         revision=row.get('hf_revision') or (REVISION if repo=='Qwen/Qwen3-0.6B' else 'main')
         folder=ROOT/'models'/repo.split('/')[-1].lower()

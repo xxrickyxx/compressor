@@ -1,4 +1,4 @@
-# API v0.4
+# API v0.6
 
 Il servizio ascolta per impostazione predefinita su `127.0.0.1:8765`.
 La chiave persistente è in `api-key.txt`; la scheda API dell’interfaccia mostra
@@ -40,7 +40,7 @@ uno stream e il server rileva la disconnessione, annulla la relativa generazione
 `extra_body={"compression_mode": "direct"}`. Il default è `direct`.
 
 Supportati: messaggi testuali `system`, `user`, `assistant`; una risposta;
-generazione deterministica `temperature=0`; massimo 128 token di risposta e
+generazione deterministica `temperature=0`; massimo 4096 token di risposta e
 contesto configurabile da 128 a 8.192 token (default 1.024). Il contesto comprende
 conversazione, template e risposta. Se il prompt lascia meno spazio del richiesto,
 la risposta viene accorciata; un prompt che riempie il contesto viene rifiutato
@@ -116,3 +116,8 @@ proxy TLS e gestione dell’accesso adeguata al deployment.
 `GET /health` è un controllo di disponibilità, senza segreti o dati dei modelli.
 Non verifica che Torch o il modello siano caricati. `/openapi.json` descrive
 le API autenticate.
+
+
+La richiesta di compressione accetta `codec: "zstd"` per CMP v2 oppure `codec: "zlib"` per CMP v1 (default API). Le API Chat Completions non salvano automaticamente chat: il client mantiene la propria cronologia. Le chat e i task dell’interfaccia sono documentati in CHAT_AND_TASKS.md.
+
+Il modello opzionale `qwen3-4b-q4-native` usa llama.cpp e GGUF Q4_K_M. Per questo ID, `compression_mode` non cambia il percorso quantizzato. Il contesto scelto determina la dimensione del processo nativo; modificandolo si ricarica il motore. Il modello mantiene le sue caratteristiche di quantizzazione, senza decoder CMP.

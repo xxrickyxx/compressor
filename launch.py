@@ -9,7 +9,7 @@ import urllib.request
 import webbrowser
 
 ROOT=Path(__file__).resolve().parent
-VERSION='0.4'
+VERSION='0.6'
 
 def environment_python():
     override=os.environ.get('COMPRESSOR_PYTHON')
@@ -17,7 +17,7 @@ def environment_python():
     candidates += [ROOT/'.venv/Scripts/python.exe',ROOT/'.venv/bin/python',Path(sys.executable)]
     for python in candidates:
         if not python.is_file(): continue
-        probe=subprocess.run([str(python),'-c',"import importlib.util,sys; sys.exit(0 if all(importlib.util.find_spec(n) for n in ('torch','transformers','psutil','safetensors')) else 1)"],
+        probe=subprocess.run([str(python),'-c',"import importlib.util,sys; sys.exit(0 if all(importlib.util.find_spec(n) for n in ('torch','transformers','psutil','safetensors','zstandard')) else 1)"],
                   stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
         if probe.returncode==0: return python
     raise RuntimeError('L’ambiente per l’inferenza non è pronto. Apri Configura.cmd nella cartella Compressione, poi riapri Avvia.cmd. Dettagli in setup.log.')

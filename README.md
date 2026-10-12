@@ -166,3 +166,19 @@ an accepted commercial order under [LICENSE-COMMERCIAL.md](LICENSE-COMMERCIAL.md
 This is **source-available dual licensing**, not OSI open source: restricting
 business use is incompatible with the [Open Source Definition](https://opensource.org/osd).
 See [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+
+## v0.5 — persistent chat, task loop and comparisons
+
+The interface supports Italian, English and Simplified Chinese. Conversations are saved locally, with optional lexical retrieval from earlier chats. Static multipage website tasks support checkpoints, continuations, step/token budgets, navigation repair and file/link checks. See [CHAT_AND_TASKS.md](CHAT_AND_TASKS.md).
+
+CMP v2 adds Zstandard; old v1 archives remain readable. Official Qwen3-4B: 8,045.0 MB → 6,298.5 MB (−21.71%), full integrity verified. Download and register: `python download_qwen17.py --size 4 --codec zstd`.
+
+[STUDY.md](STUDY.md) documents prior work, algorithms and limits of exclusivity. [CODEC_RESULTS.md](CODEC_RESULTS.md) compares identical BF16 and quantized samples. No inference throughput advantage over DwarfStar or llama.cpp has been demonstrated. Our codecs and upstream algorithms are not exclusive.
+
+Real 4B inference and quality measurements: [QWEN4_RESULTS.md](QWEN4_RESULTS.md).
+
+
+## v0.6
+
+Scoped file tools, targeted edits, backend API tests and a trusted local gym-management template with SQLite, accounts, lessons and bookings. Optional official llama.cpp + Qwen3-4B Q4 runtime for faster coding loops. See [CHAT_AND_TASKS.md](CHAT_AND_TASKS.md) and [QWEN4_RESULTS.md](QWEN4_RESULTS.md). Quantized inference is separate from lossless CMP inference.

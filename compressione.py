@@ -11,6 +11,7 @@ import mmap
 from bisect import bisect_right
 
 MAGIC = b'CMPBLK01'
+MAGIC_V2 = b'CMPBLK02'
 FOOT = struct.Struct('<Q8s')
 END = b'CMPINDEX'
 MAX_BLOCK = 16 * 1024 * 1024
@@ -28,30 +29,35 @@ def publish(temp, target):
         raise ValueError('La destinazione esiste già.')
     os.rename(temp, target)
 
-def compress(source, target, block_size=1024*1024, progress=None):
+def compress(source, target, block_size=1024*1024, progress=None, codec='zlib'):
     if not 4096 <= block_size <= MAX_BLOCK:
         raise ValueError('Dimensione blocco ammessa: da 4096 a 16777216 byte.')
+    if codec not in ('zlib','zstd'): raise ValueError('Codec ammesso: zlib o zstd.')
+    selected_codec=codec
+    if codec=='zstd':
+        import zstandard
+        encoder=zstandard.ZstdCompressor(level=3)
     dest, out, temp = atomic_target(target)
     try:
         digest = hashlib.sha256()
         blocks = []
         total = 0
         with open(source, 'rb') as src, out:
-            out.write(MAGIC)
+            out.write(MAGIC_V2 if selected_codec=='zstd' else MAGIC)
             while True:
                 raw = src.read(block_size)
                 if not raw:
                     break
                 digest.update(raw)
-                packed = zlib.compress(raw, 6)
-                codec = 'zlib' if len(packed) < len(raw) else 'raw'
-                data = packed if codec == 'zlib' else raw
+                packed = encoder.compress(raw) if selected_codec=='zstd' else zlib.compress(raw, 6)
+                codec = selected_codec if len(packed) < len(raw) else 'raw'
+                data = packed if codec != 'raw' else raw
                 blocks.append([out.tell(), len(data), len(raw), codec, zlib.crc32(raw)])
                 out.write(data)
                 total += len(raw)
                 if progress:
                     progress(total)
-            meta = {'version': 1, 'name': Path(source).name, 'size': total,
+            meta = {'version': 2 if selected_codec=='zstd' else 1, 'name': Path(source).name, 'size': total,
                     'block_size': block_size, 'sha256': digest.hexdigest(), 'blocks': blocks}
             index = json.dumps(meta, separators=(',', ':')).encode('utf8')
             out.write(index)
@@ -71,7 +77,8 @@ class Archive:
             if size < len(MAGIC) + FOOT.size:
                 raise ValueError('Archivio troppo corto.')
             f.seek(0)
-            if f.read(8) != MAGIC:
+            magic=f.read(8)
+            if magic not in (MAGIC,MAGIC_V2):
                 raise ValueError('Formato archivio non riconosciuto.')
             f.seek(-FOOT.size, 2)
             length, marker = FOOT.unpack(f.read(FOOT.size))
@@ -81,12 +88,12 @@ class Archive:
             f.seek(self.index_start)
             self.meta = json.loads(f.read(length))
         m = self.meta
-        if m['version'] != 1 or not 4096 <= m['block_size'] <= MAX_BLOCK:
+        if m['version'] != (1 if magic==MAGIC else 2) or not 4096 <= m['block_size'] <= MAX_BLOCK:
             raise ValueError('Versione o blocchi non validi.')
         offset = 8
         total = 0
         for pos, stored, raw, codec, crc in m['blocks']:
-            if pos != offset or not 0 < stored <= raw <= m['block_size'] or codec not in ('raw', 'zlib'):
+            if pos != offset or not 0 < stored <= raw <= m['block_size'] or codec not in (('raw','zlib') if m['version']==1 else ('raw','zlib','zstd')):
                 raise ValueError('Indice blocchi non valido.')
             offset += stored
             total += raw
@@ -139,6 +146,13 @@ class Archive:
             data = decoder.decompress(data, length + 1)
             if not decoder.eof or decoder.unused_data or decoder.unconsumed_tail:
                 raise ValueError('Blocco compresso danneggiato.')
+        elif codec=='zstd':
+            import zstandard
+            try:
+                if zstandard.frame_content_size(data)!=length: raise ValueError('Dimensione frame Zstandard non valida.')
+                data=zstandard.ZstdDecompressor(max_window_size=MAX_BLOCK//1024).decompress(data,max_output_size=length,allow_extra_data=False)
+            except zstandard.ZstdError as exc:
+                raise ValueError('Blocco Zstandard danneggiato.') from exc
         if len(data) != length or zlib.crc32(data) != crc:
             raise ValueError('Blocco danneggiato: verifica fallita.')
         return data
@@ -176,6 +190,7 @@ def main():
     p = sub.add_parser('comprimi')
     p.add_argument('origine'); p.add_argument('destinazione')
     p.add_argument('--blocco', type=int, default=1024*1024, help='Byte per blocco')
+    p.add_argument('--codec',choices=['zlib','zstd'],default='zlib')
     p = sub.add_parser('estrai')
     p.add_argument('origine'); p.add_argument('destinazione')
     for command in ('verifica', 'info'):
@@ -185,7 +200,7 @@ def main():
     args = parser.parse_args()
     try:
         if args.command == 'comprimi':
-            m = compress(args.origine, args.destinazione, args.blocco)
+            m = compress(args.origine, args.destinazione, args.blocco,codec=args.codec)
             size = Path(args.destinazione).stat().st_size
             saving = 100*(1-size/m['size']) if m['size'] else 0
             print(f"Originale: {m['size']:,} byte; archivio: {size:,} byte; risparmio: {saving:.2f}%")

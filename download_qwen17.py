@@ -56,11 +56,12 @@ def download_weights(repo,revision,file,folder):
     if expected_hash and digest(temporary)!=expected_hash: raise ValueError('SHA-256 del download non valido.')
     temporary.replace(target)
 
-def main():
+def main(size="1.7",codec="zlib"):
+    tag="qwen3-"+size+"b"
     root=Path(__file__).resolve().parent
-    repo='Qwen/Qwen3-1.7B'
-    folder=root/'models/qwen3-1.7b'
-    archive=root/'prove_modelli/qwen3-1.7b.cmpmodel.json'
+    repo='Qwen/Qwen3-'+size+'B'
+    folder=root/'models'/tag
+    archive=root/'prove_modelli'/(tag+'.cmpmodel.json')
     info=HfApi().model_info(repo,files_metadata=True)
     weights=[f.rfilename for f in info.siblings if f.rfilename.endswith('.safetensors')]
     names=['config.json','generation_config.json','tokenizer_config.json','tokenizer.json','vocab.json','merges.txt','LICENSE','README.md','model.safetensors.index.json']+weights
@@ -75,7 +76,7 @@ def main():
     original_size=0; compressed_size=0; shards={}; checksums={}
     for weight_name in weights:
         source=folder/weight_name
-        target=archive.parent/('qwen3-1.7b-'+weight_name+'.cmp')
+        target=archive.parent/(tag+'-'+codec+'-'+weight_name+'.cmp')
         last=[-1]
         def progress(done):
             percentage=int(100*done/source.stat().st_size)
@@ -85,25 +86,33 @@ def main():
         if target.exists():
             parsed=Archive(target); parsed.verify(); meta=parsed.meta
         else:
-            meta=compress(source,target,progress=progress)
+            meta=compress(source,target,progress=progress,codec=codec)
             Archive(target).verify()
+        expected=next(f.lfs.sha256 for f in info.siblings if f.rfilename==weight_name and f.lfs)
+        if meta['sha256']!=expected: raise ValueError('Archivio diverso dal checkpoint ufficiale.')
         original_size+=meta['size']; compressed_size+=target.stat().st_size
         shards[weight_name]=target.name; checksums[weight_name]=meta['sha256']
     index=json.loads((folder/'model.safetensors.index.json').read_text(encoding='utf8'))
     manifest={'format':'cmp-sharded-v1','shards':shards,'weight_map':index['weight_map']}
     archive.write_text(json.dumps(manifest,indent=2),encoding='utf8')
-    size=compressed_size+archive.stat().st_size
+    packed_total=compressed_size+archive.stat().st_size
     registry=root/'models.json'
     rows=json.loads(registry.read_text(encoding='utf8')) if registry.exists() else []
-    if not any(r.get('id')=='qwen3-1.7b-cmp' for r in rows):
-        rows.append({'id':'qwen3-1.7b-cmp','label':'Qwen3 · 1,7B','model_type':'qwen3',
-            'source':str(folder/'model.safetensors.index.json'),'config_dir':str(folder),'archive':str(archive),
-            'original_bytes':original_size,'compressed_bytes':size,'saving_percent':100*(1-size/original_size),
-            'integrity':'OK','hf_repo':repo,'hf_revision':info.sha})
-        registry.write_text(json.dumps(rows,indent=2,ensure_ascii=False),encoding='utf8')
-    result={'repo':repo,'revision':info.sha,'original_bytes':original_size,'compressed_bytes':size,
-            'saving_percent':100*(1-size/original_size),'compression_and_verify_seconds':time.perf_counter()-started,'sha256':checksums}
-    (root/'prove_modelli/qwen17_compression.json').write_text(json.dumps(result,indent=2),encoding='utf8')
+    rows=[r for r in rows if r.get('id')!=tag+'-cmp']
+    rows.append({'id':tag+'-cmp','label':'Qwen3 · '+size+'B','model_type':'qwen3',
+        'source':str(folder/'model.safetensors.index.json'),'config_dir':str(folder),'archive':str(archive),
+        'original_bytes':original_size,'compressed_bytes':packed_total,'saving_percent':100*(1-packed_total/original_size),
+        'integrity':'OK','hf_repo':repo,'hf_revision':info.sha})
+    registry.write_text(json.dumps(rows,indent=2,ensure_ascii=False),encoding='utf8')
+    result={'repo':repo,'revision':info.sha,'original_bytes':original_size,'compressed_bytes':packed_total,
+            'saving_percent':100*(1-packed_total/original_size),'compression_and_verify_seconds':time.perf_counter()-started,'sha256':checksums}
+    (root/'prove_modelli'/(tag+'_compression.json')).write_text(json.dumps(result,indent=2),encoding='utf8')
     print(json.dumps(result),flush=True)
 
-if __name__=='__main__': main()
+if __name__=='__main__':
+    import argparse
+    parser=argparse.ArgumentParser()
+    parser.add_argument('--size',choices=['1.7','4'],default='1.7')
+    parser.add_argument('--codec',choices=['zlib','zstd'],default='zlib')
+    options=parser.parse_args()
+    main(options.size,options.codec)

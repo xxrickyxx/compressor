@@ -15,3 +15,8 @@ DLL runtimes, the matrix_ia project or its virtual environment.
 
 Check the notices included with each installed version before redistributing
 an application containing those components.
+
+- [python-zstandard](https://github.com/indygreg/python-zstandard) (BSD) wraps [Zstandard](https://github.com/facebook/zstd) (BSD or GPLv2 upstream dual license). These codecs and algorithms are not exclusive to Compressor. Preserve their upstream notices when redistributing bundled binaries.
+- SQLite is used through Python sqlite3 for local conversation persistence. Its upstream terms remain applicable.
+
+- [llama.cpp / GGML](https://github.com/ggml-org/llama.cpp) is an optional upstream MIT-licensed runtime. Its binaries, notices, quantization kernels and algorithms remain upstream components. They are downloaded separately and are not covered by Compressor’s commercial exclusivity.

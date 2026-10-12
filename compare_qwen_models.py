@@ -30,10 +30,14 @@ def main():
     for model_id in selected:
         row=next(r for r in rows if r.get('id')==model_id)
         available=psutil.virtual_memory().available
-        if available < row['original_bytes']+700*1024*1024:
+        if row.get('backend')!='llama.cpp' and available < row['original_bytes']+700*1024*1024:
             raise RuntimeError(f'RAM libera insufficiente per il confronto in cache: {model_id}.')
         print('Preparazione '+model_id,flush=True)
-        engine=CompressedEngine(row['archive'],row['config_dir'],'ram')
+        if row.get('backend')=='llama.cpp':
+            import threading
+            from native_engine import NativeEngine
+            engine=NativeEngine(row,status=lambda text:print(text,flush=True),stop=threading.Event())
+        else:engine=CompressedEngine(row['archive'],row['config_dir'],'ram')
         try:
             answers=[]
             for name,prompt,expected in TASKS:

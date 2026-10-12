@@ -66,3 +66,19 @@ I numeri dei blocchi partono da zero. `--blocco 262144` imposta blocchi da 256 K
 Estendere il motore a BitNet/GGUF; confrontare codifiche adatte ai pesi; ottimizzare letture e cache. Questa versione non mappa ancora gli esperti MoE.
 
 Avvia.cmd usa il Python già disponibile sul computer tramite Codex, oppure Python nel PATH. Non richiede pacchetti aggiuntivi.
+
+
+## v0.5 — chat, loop e confronto
+
+Interfaccia italiano / English / 简体中文. Conversazioni persistenti e recupero lessicale facoltativo delle chat precedenti. Loop per siti statici multipagina con checkpoint, continuazioni, budget e controlli dei link. Vedere [CHAT_AND_TASKS.md](CHAT_AND_TASKS.md).
+
+CMP v2 aggiunge Zstandard; v1 resta leggibile. Qwen3-4B ufficiale: 8.045,0 MB → 6.298,5 MB (−21,71%), integrità verificata. Download: `python download_qwen17.py --size 4 --codec zstd`.
+
+[STUDY.md](STUDY.md) documenta precedenti, algoritmi e limiti dell’esclusività; [CODEC_RESULTS.md](CODEC_RESULTS.md) contiene misure lossless sugli stessi campioni BF16 e quantizzati. Nessun vantaggio token/s rispetto a DwarfStar o llama.cpp dimostrato.
+
+Misure reali del 4B: [QWEN4_RESULTS.md](QWEN4_RESULTS.md).
+
+
+## v0.6
+
+Scoped file tools, targeted edits, backend API tests and a trusted local gym-management template with SQLite, accounts, lessons and bookings. Optional official llama.cpp + Qwen3-4B Q4 runtime for faster coding loops. See [CHAT_AND_TASKS.md](CHAT_AND_TASKS.md) and [QWEN4_RESULTS.md](QWEN4_RESULTS.md). Quantized inference is separate from lossless CMP inference.

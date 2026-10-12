@@ -14,3 +14,9 @@ api-key.txt
 runtime/windows/
 *.jpg
 backups/
+
+data/
+outputs/
+*.sqlite3*
+.compressione-*
+runtime/llama/
